@@ -48,7 +48,7 @@
 
     function sendMessage(message){
       $.post('/messages', message)
-      if(sendMessage.message("hi") > -1 || sendMessage.message("hello") > -1 || sendMessage.message("welcome") > -1 )
+      if(sendMessage.indexOF("hi") > -1 || sendMessage.indexOF("hello") > -1 || sendMessage.indexOF("welcome") > -1 )
 		{
 			return "Hi!";
 		}
