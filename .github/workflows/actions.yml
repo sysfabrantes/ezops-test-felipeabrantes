@@ -75,5 +75,5 @@ jobs:
       - name: Run new container
         run: ssh staging 'docker run --name=${{ env.REPO_NAME }} -p 80:${{ env.PORT }} -d ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.RUN_ID }}'
 
-      - name: Public IP
+      - name: Public IP for access
         run: ssh staging 'dig +short myip.opendns.com @resolver1.opendns.com'
