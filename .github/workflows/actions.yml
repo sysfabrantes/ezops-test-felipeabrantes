@@ -1,0 +1,79 @@
+# This workflow uses actions that are not certified by GitHub.
+# São fornecidas por terceiros e regidas por
+# termos de serviço, política de privacidade e suporte separados
+# documentação.
+
+name: Deploy_Aplication
+
+on:
+  push:
+    branches: ['main']
+
+env:
+  SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+  SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+  SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  REPO_NAME: ${{ github.event.repository.name }}
+  PORT: ${{ secrets.PORT }}
+  RUN_ID: ${{ github.run_id }}
+
+jobs:
+  deploy_aplication:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.RUN_ID }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
+        with:
+          context: .
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.RUN_ID }}
+          labels: ${{ steps.meta.outputs.labels }}
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh/
+          echo "$SSH_KEY" > ~/.ssh/staging.key
+          chmod 600 ~/.ssh/staging.key
+          cat >>~/.ssh/config <<END
+          Host staging
+            HostName $SSH_HOST
+            User $SSH_USER
+            IdentityFile ~/.ssh/staging.key
+            StrictHostKeyChecking no
+          END
+      - name: Log in to the Container registry
+        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Remove old container
+        run: ssh staging 'docker rm -f ${{ env.REPO_NAME }}'
+
+      - name: Run new container
+        run: ssh staging 'docker run --name=${{ env.REPO_NAME }} -p 80:${{ env.PORT }} -d ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.RUN_ID }}'
+
+      - name: Public IP
+        run: ssh staging 'dig +short myip.opendns.com @resolver1.opendns.com'
